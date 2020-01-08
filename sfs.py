@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy import special, stats
 
+import tqdm
+
 
 func_types_exac = {"LOF" : ['stop_gained', 'splice_acceptor_variant', 'splice_donor_variant'],
                 "nonsynon" : ['stop_gained', 'splice_acceptor_variant', 'splice_donor_variant', 'missense_variant'],
@@ -94,11 +96,13 @@ def load_simulated_sfs(filename: str) -> pd.Series:
 
 def load_simulated_sfs_genes(template: str, trials: int = 1000, sample_size: int = 68858) -> pd.Series:
     sim_dict = {}
-    for h, s in itertools.chain([(0.5, "NEUTRAL")], itertools.product([0.0, 0.1, 0.3, 0.5], ["-1.0", "-2.0", "-3.0", "-4.0"])):
-        for logL in np.arange(2.0, 5.1, 0.1).round(1):
-            for seed in range(1, trials+1):
-                filename = template.format(h=h, s=s, logL=logL, seed=seed)
-                sim_dict[h, s, logL, seed] = load_simulated_sfs(filename)
+    with tqdm.tqdm(total=17*31*trials) as pbar:
+        for h, s in itertools.chain([(0.5, "NEUTRAL")], itertools.product([0.0, 0.1, 0.3, 0.5], ["-1.0", "-2.0", "-3.0", "-4.0"])):
+            for logL in np.arange(2.0, 5.1, 0.1).round(1):
+                for seed in range(1, trials+1):
+                    filename = template.format(h=h, s=s, logL=logL, seed=seed)
+                    sim_dict[h, s, logL, seed] = load_simulated_sfs(filename)
+                    pbar.update(1)
     return pd.concat(sim_dict, names=["h", "s", "logL", "seed"]).groupby(level=["h","s","logL","seed"]).apply(SFSUnroller(sample_size)).squeeze()
 
 
