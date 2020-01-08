@@ -20,7 +20,7 @@ ref_templates = { 'tennessen' : "SFS_tennessen_european_samplesize_68858_S_{s}_h
                   'supertennessen' : "SFS_supertennessen_european_samplesize_68858_S_{s}_h_{h}_mu_-8.0_L_6.0_growth_0.03_seed_sum_1_1000.tsv",
                   'subtennessen' : "SFS_supertennessen_european_samplesize_68858_S_{s}_h_{h}_mu_-8.0_L_6.0_growth_0.005_seed_sum_1_1000.tsv" }
 
-exac_template = "ExAC_63K_variants.chr{chr}.tsv.gz"
+exac_template = "ExAC_63K.counts.pantro2.PSIC.canonical.chr{chr}.tsv"
 cpg_template = "CpG/chr{chr}.cpg.tsv"
 rates_template = "chr{chr}.rates.csv"
 pph_template = "chr{chr}.pph.rates.csv"
