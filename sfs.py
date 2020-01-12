@@ -7,6 +7,7 @@ import attr
 
 import numpy as np
 import pandas as pd
+import dask.array as da
 from scipy import special, stats
 
 import tqdm
@@ -83,6 +84,7 @@ def load_exac_sfs(exac_filename: str, cpg_filename: str, sample_size: int = 6885
     return pd.concat(func_sfsa, axis=1, names=["func", "gene"]).swaplevel(axis="columns").sort_index(axis="columns")
 
 
+
 def load_exac_log_lengths(func_types_filename: str, pph_filename: str, mu: float = 1e-8) -> pd.Series:
     """
     Reads CSVs containing target sizes and returns a Series containing gene lengths, indexed by (gene, func)
@@ -157,13 +159,20 @@ def calculate_prf_loglikelihood(reference_sfs_df: pd.DataFrame, observed_sfs_df:
     and an observed_logL Series keyed by the same key as observed_sfs.
     Returns a DataFrame whose rows are the input keys and columns are (h,s).
     """
-    def single_key_loglikelihood(key):
-        lamda = reference_sfs_df * 10 ** (observed_logL.get(key, np.nan))
-        k = observed_sfs_df[key]
-        log_k_factorial = special.gammaln(observed_sfs + 1)
-        return pd.eval("k * log(lamda.T) - lambda - log_k_factorial").agg(np.nansum)
-    keys = observed_sfs_df.keys().to_series()
-    return keys.apply(single_key_loglikelihood)
+    common_observed_keys = observed_sfs_df.keys() & observed_logL.keys() # get the list of keys common to observed SFS and logL
+    # convert input data to dask arrays
+    observed_logL_da = da.from_array(observed_logL[common_observed_keys].values, chunks=100) # n_keys
+    observed_sfs_da = da.from_array(observed_sfs_df[common_observed_keys].values, chunks=(None, 100)) # sample_size x n_keys
+    ref_sfs_da = da.from_array(reference_sfs_df.values) # sample_size x 17
+    
+    # scale reference sfs by observed length
+    scaled_ref_da = ref_sfs_da.T[...,np.newaxis] * 10**observed_logL_da # 17 x sample_size x n_keys
+    # calculate per-bin log likelihood
+    poisson_loglikelihood = observed_sfs_da * da.log(scaled_ref_da) - scaled_ref_da - special.gammaln(scaled_ref_da+1) # 17 x sample_size x n_keys
+    # aggregate log likelihood 
+    combined_loglikelihood = da.nansum(poisson_loglikelihood, axis=1).T # n_keys x 17
+    
+    return pd.DataFrame(combined_loglikelihood.compute(), columns = reference_sfs_df.keys(), index = common_observed_keys)
 
 
 def compute_summary_stats(sfs_df: pd.DataFrame, sample_size: int = 68858) -> pd.DataFrame:
